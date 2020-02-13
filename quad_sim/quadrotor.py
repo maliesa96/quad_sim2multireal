@@ -63,8 +63,8 @@ EPS = 1e-6  # small constant to avoid divisions by 0 and log(0)
 GOAL_TOLERANCE = 0.01
 
 # set initial epsilon to infinity
-epsilon_0 = np.inf
-epsilon_1 = np.inf
+#epsilon_0 = np.inf
+#epsilon_1 = np.inf
 
 
 ## WARN:
@@ -612,16 +612,16 @@ def compute_reward_weighted(dynamics, goal, goals, action, dt, crashed, reached,
     # rew_coeff["pos_log_weight"] * np.log(dist + rew_coeff["pos_offset"]) + rew_coeff["pos_linear_weight"] * dist)
     # loss_pos = dist
 
-    global epsilon_0
-    global epsilon_1
+    #global epsilon_0
+    #global epsilon_1
 
     dist_0 = np.linalg.norm(goals[0] - dynamics.pos)
-    epsilon_0 = min(epsilon_0, dist_0)
-    loss_pos_0 = rew_coeff["pos"] * epsilon_0 * dist_0
+    #epsilon_0 = min(epsilon_0, dist_0)
+    loss_pos_0 = rew_coeff["pos"] * dist_0
 
     dist_1 = np.linalg.norm(goals[1] - dynamics.pos)
-    epsilon_1 = min(epsilon_1, dist_1)
-    loss_pos_1 = flags[0] * rew_coeff["pos"] * epsilon_1 * dist_1
+    #epsilon_1 = min(epsilon_1, dist_1)
+    loss_pos_1 = flags[0] * 2 * rew_coeff["pos"] * dist_1
 
     loss_pos = loss_pos_0 + loss_pos_1
 
@@ -1656,8 +1656,8 @@ class QuadrotorEnv(gym.Env, Serializable):
         
         if self.num_vis_goals > 1:
             
-            epsilon_0 = np.inf
-            epsilon_1 = np.inf
+            #epsilon_0 = np.inf
+            #epsilon_1 = np.inf
             
             self.sample_goals()
             self.flags = np.zeros([self.num_vis_goals])
