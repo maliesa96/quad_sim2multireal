@@ -682,7 +682,7 @@ def compute_reward_weighted(rew_type, dynamics, goal, goal_dist, action, dt, cra
             loss_pos[i] += (not reached[i-1]) * 2 * (rew_coeff['multi_goal_scaling'] ** i) * goal_dist
         # set loss for orient to 0 if the first goal point has been reached
         if len(reached) > 0 and reached[0]: # reached should always be greater than 0 here ?
-            loss_orient
+            loss_orient = 0.0
     else:
         raise NotImplementedError("rew_type " + rew_type + " is either invalid or has not been implemented")
 
