@@ -557,7 +557,55 @@ def compute_reward_weighted(rew_type, dynamics, goal, goal_dist, action, dt, cra
     ##################################################
     assert len(goal) % 3 == 0
     num_goals = len(goal)//3
+
+    ##################################################
+    ## penalize altitude above this threshold
+    # max_alt = 6.0
+    # loss_alt = np.exp(2*(dynamics.pos[2] - max_alt))
+
+    ##################################################
+    # penalize amount of control effort
+    loss_effort = rew_coeff["effort"] * np.linalg.norm(action)
+    dact = action - action_prev
+    loss_act_change = rew_coeff["action_change"] * (dact[0]**2 + dact[1]**2 + dact[2]**2 + dact[3]**2)**0.5
+
+    ##################################################
+    ## loss velocity
+    # dx = goal - dynamics.pos
+    # dx = dx / (np.linalg.norm(dx) + EPS)
     
+    ## normalized    
+    # vel_direct = dynamics.vel / (np.linalg.norm(dynamics.vel) + EPS)
+    # vel_magn = np.clip(np.linalg.norm(dynamics.vel),-1, 1)
+    # vel_clipped = vel_magn * vel_direct 
+    # vel_proj = np.dot(dx, vel_clipped)
+    # loss_vel_proj = - rew_coeff["vel_proj"] * dist * vel_proj
+
+    # loss_vel_proj = 0. 
+    loss_vel = rew_coeff["vel"] * np.linalg.norm(dynamics.vel)
+
+    ##################################################
+    ## Loss orientation
+    loss_orient = -rew_coeff["orient"] * dynamics.rot[2,2] 
+    loss_yaw = -rew_coeff["yaw"] * dynamics.rot[0,0]
+    # Projection of the z-body axis to z-world axis
+    # Negative, because the larger the projection the smaller the loss (i.e. the higher the reward)
+    rot_cos = ((dynamics.rot[0,0] +  dynamics.rot[1,1] +  dynamics.rot[2,2]) - 1.)/2.
+    #We have to clip since rotation matrix falls out of orthogonalization from time to time
+    loss_rotation = rew_coeff["rot"] * np.arccos(np.clip(rot_cos, -1.,1.)) #angle = arccos((trR-1)/2) See: [6]
+    loss_attitude = rew_coeff["attitude"] * np.arccos(np.clip(dynamics.rot[2,2], -1.,1.))
+
+    ##################################################
+    ## Loss for constant uncontrolled rotation around vertical axis
+    # loss_spin_z  = rew_coeff["spin_z"]  * abs(dynamics.omega[2])
+    # loss_spin_xy = rew_coeff["spin_xy"] * np.linalg.norm(dynamics.omega[:2])
+    # loss_spin = rew_coeff["spin"] * np.linalg.norm(dynamics.omega) 
+    loss_spin = rew_coeff["spin"] * (dynamics.omega[0]**2 + dynamics.omega[1]**2 + dynamics.omega[2]**2)**0.5 
+
+    ##################################################
+    ## loss crash
+    loss_crash = rew_coeff["crash"] * float(crashed)
+
     loss_pos = []
     dist = []
     ## log to create a sharp peak at the goal
@@ -623,56 +671,20 @@ def compute_reward_weighted(rew_type, dynamics, goal, goal_dist, action, dt, cra
             loss_pos[i] *= np.prod(reached[:i])
         for i in range(1, num_goals):
             loss_pos[i] += (not reached[i-1]) * 2 * (rew_coeff['multi_goal_scaling'] ** i) * goal_dist
+    elif rew_type == 'no_z_after_reached':
+        assert reached is not None
+        # this reward currently functioning the same as all_goal_positive except that
+        # the the loss for orientation will be set to 0 after the first point is reached
+        # activate loss_pos[i] only if all previous goals are reached
+        for i in range(num_goals):
+            loss_pos[i] *= np.prod(reached[:i])
+        for i in range(1, num_goals):
+            loss_pos[i] += (not reached[i-1]) * 2 * (rew_coeff['multi_goal_scaling'] ** i) * goal_dist
+        # set loss for orient to 0 if the first goal point has been reached
+        if len(reached) > 0 and reached[0]: # reached should always be greater than 0 here ?
+            loss_orient
     else:
         raise NotImplementedError("rew_type " + rew_type + " is either invalid or has not been implemented")
-
-    ##################################################
-    ## penalize altitude above this threshold
-    # max_alt = 6.0
-    # loss_alt = np.exp(2*(dynamics.pos[2] - max_alt))
-
-    ##################################################
-    # penalize amount of control effort
-    loss_effort = rew_coeff["effort"] * np.linalg.norm(action)
-    dact = action - action_prev
-    loss_act_change = rew_coeff["action_change"] * (dact[0]**2 + dact[1]**2 + dact[2]**2 + dact[3]**2)**0.5
-
-    ##################################################
-    ## loss velocity
-    # dx = goal - dynamics.pos
-    # dx = dx / (np.linalg.norm(dx) + EPS)
-    
-    ## normalized    
-    # vel_direct = dynamics.vel / (np.linalg.norm(dynamics.vel) + EPS)
-    # vel_magn = np.clip(np.linalg.norm(dynamics.vel),-1, 1)
-    # vel_clipped = vel_magn * vel_direct 
-    # vel_proj = np.dot(dx, vel_clipped)
-    # loss_vel_proj = - rew_coeff["vel_proj"] * dist * vel_proj
-
-    # loss_vel_proj = 0. 
-    loss_vel = rew_coeff["vel"] * np.linalg.norm(dynamics.vel)
-
-    ##################################################
-    ## Loss orientation
-    loss_orient = -rew_coeff["orient"] * dynamics.rot[2,2] 
-    loss_yaw = -rew_coeff["yaw"] * dynamics.rot[0,0]
-    # Projection of the z-body axis to z-world axis
-    # Negative, because the larger the projection the smaller the loss (i.e. the higher the reward)
-    rot_cos = ((dynamics.rot[0,0] +  dynamics.rot[1,1] +  dynamics.rot[2,2]) - 1.)/2.
-    #We have to clip since rotation matrix falls out of orthogonalization from time to time
-    loss_rotation = rew_coeff["rot"] * np.arccos(np.clip(rot_cos, -1.,1.)) #angle = arccos((trR-1)/2) See: [6]
-    loss_attitude = rew_coeff["attitude"] * np.arccos(np.clip(dynamics.rot[2,2], -1.,1.))
-
-    ##################################################
-    ## Loss for constant uncontrolled rotation around vertical axis
-    # loss_spin_z  = rew_coeff["spin_z"]  * abs(dynamics.omega[2])
-    # loss_spin_xy = rew_coeff["spin_xy"] * np.linalg.norm(dynamics.omega[:2])
-    # loss_spin = rew_coeff["spin"] * np.linalg.norm(dynamics.omega) 
-    loss_spin = rew_coeff["spin"] * (dynamics.omega[0]**2 + dynamics.omega[1]**2 + dynamics.omega[2]**2)**0.5 
-
-    ##################################################
-    ## loss crash
-    loss_crash = rew_coeff["crash"] * float(crashed)
 
     # reward = -dt * np.sum([loss_pos, loss_effort, loss_alt, loss_vel_proj, loss_crash])
     # rew_info = {'rew_crash': -loss_crash, 'rew_altitude': -loss_alt, 'rew_action': -loss_effort, 'rew_pos': -loss_pos, 'rew_vel_proj': -loss_vel_proj}
