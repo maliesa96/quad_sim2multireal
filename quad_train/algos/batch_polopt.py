@@ -81,6 +81,11 @@ class BatchPolopt(RLAlgorithm):
         del self.args["self"]
         self.args = {**self.args, **kwargs} #merging dicts
 
+        # if we always want the orientation loss, never change it
+        self.last_iteration_w_orient_loss = float("inf")
+        if "no_z_after_iteration" in self.args:
+            self.last_iteration_w_orient_loss = self.args["no_z_after_iteration"]
+
         self.env = env
         try:
             self.env.env.save_dyn_params(filename=logger.get_snapshot_dir().rstrip(os.sep) + os.sep + "dyn_params.yaml")
@@ -272,6 +277,10 @@ class BatchPolopt(RLAlgorithm):
         last_average_return = None
         samples_total = 0
         for itr in range(self.start_itr, self.n_itr):
+
+            if itr == self.last_iteration_w_orient_loss:
+                print("Changing orientation reward coefficient to 0 at iteration %d..." % itr)
+                self.env.env.rew_coeff["orient"] = 0.0
             if samples_total >= self.max_samples:
                 print("WARNING: Total max num of samples collected: %d >= %d" % (samples_total, self.max_samples))
                 break

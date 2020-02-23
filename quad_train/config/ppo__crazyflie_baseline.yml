@@ -42,10 +42,12 @@ variant:
     optimizer_args: 
       batch_size: 128
       max_epochs: 20
+    no_z_after_iteration: 0 # iteration number at which we set orientation reward coefficient to 0
     plot: False
     store_paths: False
     play_every_itr: null
     record_every_itr: 100
+
   baseline_class: GaussianMLPBaseline
   baseline_param: {} 
   policy_class: GaussianMLPPolicy
